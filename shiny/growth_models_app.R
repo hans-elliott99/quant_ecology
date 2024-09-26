@@ -17,20 +17,29 @@ sim_data <- function(r = 3,
     t <- 0
     N <- N0
     while (t <= t_max) {
-        dN <- (r + s * N) * N * dt
+        dN <- N * (r + s * N) * dt
         out <- rbind(out,
                      list(t = t, N = N, dN = dN))
         # update time and population size
         t <- t + dt
         N <- N + dN
+        if (N < 0) N <- 0
+    }
+    if (s > 0 & r > 0) {
+        sing_t <- (1/r) * log(1 + r/(s * N0)) # time of singularity
+    } else {
+        sing_t <- Inf # no singularity
     }
     out <- within(out, {
+        N <- ifelse(t <= sing_t, N, NA)
         dN_dt <- dN / dt
         growth <- dN_dt / N
     })
+    
     attr(out, "r") <- r
     attr(out, "s") <- s
     attr(out, "N0") <- N0
+    attr(out, "sing_t") <- sing_t
     row.names(out) <- NULL
     return(out)
 }
@@ -59,6 +68,12 @@ ui <- fluidPage(
     uiOutput("growth_formula1"),
     sidebarLayout(
         sidebarPanel(
+            selectInput("x_axis", "X-axis",
+                        choices = c("t", "N", "dN", "dN/dt", "growth"),
+                        selected = "t"),
+            selectInput("y_axis", "Y-axis",
+                        choices = c("t", "N", "dN", "dN/dt", "growth"),
+                        selected = "N"),
             sliderInput("r", "r: Intrinsic growth rate",
                         min = -5, max = 5, value = 3, step = 0.1),
             p("The intrinsic growth rate is the rate at which the population grows ",
@@ -81,13 +96,7 @@ ui <- fluidPage(
             p("Decreasing dt towards 0 intends to simulate infinitely small time steps, ",
               "moving from a difference equation to a differential equation."),
             sliderInput("t_max", "End period",
-                        min = 20, max = 100, step = 20, value = 20),
-            selectInput("x_axis", "X-axis",
-                        choices = c("t", "N", "dN", "dN/dt", "growth"),
-                        selected = "t"),
-            selectInput("y_axis", "Y-axis",
-                        choices = c("t", "N", "dN", "dN/dt", "growth"),
-                        selected = "N")
+                        min = 10, max = 100, step = 10, value = 20)
         ),
         mainPanel(
             plotOutput("single_species_plot"),
@@ -118,8 +127,13 @@ server <- function(input, output, session) {
         y_ax <- input$y_axis
         if (x_ax == "dN/dt") x_ax <- "dN_dt"
         if (y_ax == "dN/dt") y_ax <- "dN_dt"
+        dat <- simmed()
+        r <- attr(dat, "r")
+        s <- attr(dat, "s")
+        N0 <- attr(dat, "N0")
+        sing_t <- attr(dat, "sing_t")
         
-        p <- ggplot(simmed(), aes_string(x = x_ax, y = y_ax)) +
+        p <- ggplot(dat, aes(x = !!sym(x_ax), y = !!sym(y_ax))) +
             geom_line(alpha = 0.5) +
             geom_point(size = 1) +
             scale_color_manual(values = c("Differential Eq. Solution" = "red")) +
@@ -128,31 +142,30 @@ server <- function(input, output, session) {
             theme_minimal() +
             theme(legend.position = "bottom")
         
-        differ <- solve_diff_eq(simmed(), t_max = input$t_max)
+        differ <- solve_diff_eq(dat, t_max = input$t_max)
+        differ[differ$x > sing_t, "y"] <- NA
         if (x_ax == "t" & y_ax == "N") {
             p <- p +
                 geom_line(data = differ,
                           aes(x = x, y = y, color = "Differential Eq. Solution"),
                           alpha = 0.5)
         }
-        
-        r <- attr(simmed(), "r")
-        s <- attr(simmed(), "s")
-        N0 <- attr(simmed(), "N0")
         # if (s < 0 && r > 0) {
         #     K <- -r/s # carrying capacity
         #     p <- p + geom_hline(yintercept = K, linetype = "dashed")
         # }
-        # if (s > 0) {
-        #     t <- (1/r) * log(1 + r/(s * N0)) # time of singularity
-        #     p <- p + geom_vline(xintercept = t, linetype = "dashed")
-        # }
+        if (s > 0 && r > 0) {
+            p <- p +
+                geom_vline(xintercept = sing_t,
+                           alpha = 0.5) +
+                labs(caption = paste("Singularity at t =", round(sing_t, 3)))
+        }
         
         # Density Plot
-        p2 <- ggplot(subset(simmed(), t > 5),
-                     aes_string(x = "N")) +
+        p2 <- ggplot(subset(dat, t > 5),
+                     aes(x = !!sym(y_ax))) +
             geom_histogram(bins = 10) +
-            labs(x = "N", y = "Count", title = "Distribution after t = 5") +
+            labs(x = y_ax, y = "Count", title = "Distribution after t = 5") +
             theme_minimal() +
             coord_flip()
         
