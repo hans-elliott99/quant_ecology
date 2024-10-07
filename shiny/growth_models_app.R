@@ -58,6 +58,45 @@ solve_diff_eq <- function(simdat, t_max, length.out = 1000) {
     return(differ)
 }
 
+#' plot direction field
+#' f: differential equation function with signature `function(t, y)`
+plot_directionfield <- function(f,
+                                t_range = c(-5, 5),
+                                y_range = c(-5, 5),
+                                radius = 0.1, grid.by.t = 0.25, grid.by.y = 0.25,
+                                alpha = 1){
+    # credit:
+    # https://stackoverflow.com/questions/47984874/how-to-create-a-slope-field-in-r
+    
+    # initial plot - ensure large enough
+    plot(t_range, y_range,
+         main = "Direction field", ylab = "y", xlab = "t",
+         pch = ".")
+    # plot arrows
+    tlin = seq(min(t_range), max(t_range), grid.by.t)
+    ylin = seq(min(y_range), max(y_range), grid.by.y)
+    for(x in tlin) {
+        for(y in ylin) {
+            slope = f(x, y)
+            if(is.na(slope)) {
+                col = rgb(0, 0, 0, alpha)
+            } else if(slope > 0) {
+                col = rgb(0, 0, 1, alpha)
+            } else if (slope < 0) {
+                col = rgb(1, 0, 0, alpha)
+            } else if(slope == 0) {
+                col = rgb(0, 1, 0, alpha)
+            }
+            arrows(radius * cos(atan(slope) + pi) + x,
+                   radius * sin(atan(slope) + pi) + y,
+                   radius * cos(atan(slope)) + x,
+                   radius * sin(atan(slope)) + y, 
+                   length = 0.2 * radius, col = col)
+        }
+    }
+}
+
+
 
 ui <- fluidPage(
     withMathJax(),
@@ -69,10 +108,10 @@ ui <- fluidPage(
     sidebarLayout(
         sidebarPanel(
             selectInput("x_axis", "X-axis",
-                        choices = c("t", "N", "dN", "dN/dt", "growth"),
+                        choices = c("t", "N", "dN", "dN/dt", "growth per-capita"),
                         selected = "t"),
             selectInput("y_axis", "Y-axis",
-                        choices = c("t", "N", "dN", "dN/dt", "growth"),
+                        choices = c("t", "N", "dN", "dN/dt", "growth per-capita"),
                         selected = "N"),
             sliderInput("r", "r: Intrinsic growth rate",
                         min = -5, max = 5, value = 3, step = 0.1),
@@ -101,6 +140,7 @@ ui <- fluidPage(
         mainPanel(
             plotOutput("single_species_plot"),
             tableOutput("growth_descr_table"),
+            plotOutput("direction_field"),
             p("If s = 0, the population grows exponentially - i.e., the population is independent of its own density (N)."),
             p("If s > 0, the population grows orthologistically - i.e., the growth rate increases with population density, or the population is 'density-enhanced'. This model can only be useful at certain ranges, for it will reach a singularity point."),
             p("If s < 0, the population grows logistically - i.e., the growth rate decreases with population density, or the population is 'density-limited' and will reach a carrying capacity K = -r/s.")
@@ -122,11 +162,16 @@ server <- function(input, output, session) {
                  dt = as.numeric(input$dt),
                  t_max = as.integer(input$t_max))
     })
+    axes_map <- c(
+        "t" = "t",
+        "N" = "N",
+        "dN" = "dN",
+        "dN/dt" = "dN_dt",
+        "growth per-capita" = "growth"
+    )
     output$single_species_plot <- renderPlot({
-        x_ax <- input$x_axis
-        y_ax <- input$y_axis
-        if (x_ax == "dN/dt") x_ax <- "dN_dt"
-        if (y_ax == "dN/dt") y_ax <- "dN_dt"
+        x_ax <- axes_map[input$x_axis]
+        y_ax <- axes_map[input$y_axis]
         dat <- simmed()
         r <- attr(dat, "r")
         s <- attr(dat, "s")
@@ -184,6 +229,25 @@ server <- function(input, output, session) {
             "Model" = names(tbl),
             "Description" = tbl
         )
+    })
+    output$direction_field <- renderPlot({
+        dat <- simmed()
+        r <- attr(dat, "r")
+        s <- attr(dat, "s")
+        N0 <- attr(dat, "N0")
+        y_max <- min(max(dat$N, na.rm = TRUE) + 0.1, 1)
+        t_max <- input$t_max
+        
+        
+        
+        f <- \(t, N) N * (r + s * N)
+        plot_directionfield(f,
+                            t_range = c(0, t_max),
+                            y_range = c(0, y_max),
+                            grid.by.t = t_max/40,
+                            grid.by.y = y_max/50,
+                            radius = t_max/(200 * (t_max/20)),
+                            alpha = 0.7)
     })
 }
 
