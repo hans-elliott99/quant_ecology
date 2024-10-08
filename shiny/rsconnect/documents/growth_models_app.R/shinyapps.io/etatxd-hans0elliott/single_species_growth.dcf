@@ -1,0 +1,12 @@
+name: single_species_growth
+title: single_species_growth
+username: etatxd-hans0elliott
+account: etatxd-hans0elliott
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 12950226
+bundleId: 9195499
+url: https://etatxd-hans0elliott.shinyapps.io/single_species_growth/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE

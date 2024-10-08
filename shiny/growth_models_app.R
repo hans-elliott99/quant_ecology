@@ -63,7 +63,8 @@ solve_diff_eq <- function(simdat, t_max, length.out = 1000) {
 plot_directionfield <- function(f,
                                 t_range = c(-5, 5),
                                 y_range = c(-5, 5),
-                                radius = 0.1, grid.by.t = 0.25, grid.by.y = 0.25,
+                                radius = 0.1,
+                                grid.by.t = 0.25, grid.by.y = 0.25,
                                 alpha = 1){
     # credit:
     # https://stackoverflow.com/questions/47984874/how-to-create-a-slope-field-in-r
@@ -102,9 +103,14 @@ ui <- fluidPage(
     withMathJax(),
     h1("Basic models of population growth"),
     p("Inspired by 'Quantitative Ecology: A New Unified Approach' by Lehman, Loberg, and Clark."),
-    p("H. Elliott"),
     h2("Single-Species Dynamics"),
+    p(paste(
+        "Let N(t) describe the population size of some species evolving over time.\n",
+        "The (per-capita) population growth can be described by the following differential equation,",
+        "where r and s are parameters that depend on the scenario being modeled."
+    )),
     uiOutput("growth_formula1"),
+    tableOutput("growth_descr_table"),
     sidebarLayout(
         sidebarPanel(
             selectInput("x_axis", "X-axis",
@@ -139,7 +145,6 @@ ui <- fluidPage(
         ),
         mainPanel(
             plotOutput("single_species_plot"),
-            tableOutput("growth_descr_table"),
             plotOutput("direction_field"),
             p("If s = 0, the population grows exponentially - i.e., the population is independent of its own density (N)."),
             p("If s > 0, the population grows orthologistically - i.e., the growth rate increases with population density, or the population is 'density-enhanced'. This model can only be useful at certain ranges, for it will reach a singularity point."),
@@ -162,16 +167,49 @@ server <- function(input, output, session) {
                  dt = as.numeric(input$dt),
                  t_max = as.integer(input$t_max))
     })
-    axes_map <- c(
-        "t" = "t",
-        "N" = "N",
-        "dN" = "dN",
-        "dN/dt" = "dN_dt",
-        "growth per-capita" = "growth"
-    )
+    axes_map <- function(key) {
+        c(
+            "t" = "t",
+            "N" = "N",
+            "dN" = "dN",
+            "dN/dt" = "dN_dt",
+            "growth per-capita" = "growth"
+        )[key]
+    }
+    
+    subtitle_map <- function(s, r) {
+        if (s > 0) {
+            if (r > 0) {
+                subt <- "Orthologistic growth"
+            } else if (r < 0) {
+                subt <- "Orthologistic decay"
+            } else {
+                # r = 0, then dN/dt = sN^2
+                subt <- "Orthologistic growth"
+            }
+        } else if (s == 0) {
+            if (r > 0) {
+                subt <- "Exponential growth"
+            } else if (r < 0) {
+                subt <- "Exponential decay"
+            } else { # r == 0
+                subt <- "No growth"
+            }
+        } else { # s < 0
+            if (r > 0) {
+                subt <- "Logistic growth"
+            } else if (r < 0) {
+                subt <- "Logistic decay"
+            } else {
+                # r = 0, then dN/dt = -sN^2
+                subt <- "Logistic decay"
+            }
+        }
+        paste0(subt, " (r = ", r, ", s = ", s, ")")
+    }
     output$single_species_plot <- renderPlot({
-        x_ax <- axes_map[input$x_axis]
-        y_ax <- axes_map[input$y_axis]
+        x_ax <- axes_map(input$x_axis)
+        y_ax <- axes_map(input$y_axis)
         dat <- simmed()
         r <- attr(dat, "r")
         s <- attr(dat, "s")
@@ -183,22 +221,24 @@ server <- function(input, output, session) {
             geom_point(size = 1) +
             scale_color_manual(values = c("Differential Eq. Solution" = "red")) +
             labs(title = "Population Projection",
-                 x = x_ax, y = y_ax, color = "") +
+                 subtitle = subtitle_map(s, r),
+                 x = input$x_axis, y = input$y_axis, color = "") +
             theme_minimal() +
             theme(legend.position = "bottom")
         
         differ <- solve_diff_eq(dat, t_max = input$t_max)
         differ[differ$x > sing_t, "y"] <- NA
+        differ <- differ[!is.na(differ$y), ]
         if (x_ax == "t" & y_ax == "N") {
             p <- p +
                 geom_line(data = differ,
                           aes(x = x, y = y, color = "Differential Eq. Solution"),
                           alpha = 0.5)
         }
-        # if (s < 0 && r > 0) {
-        #     K <- -r/s # carrying capacity
-        #     p <- p + geom_hline(yintercept = K, linetype = "dashed")
-        # }
+        if (s < 0 && r > 0) {
+            K <- -r/s # carrying capacity
+            p <- p + labs(caption = paste("Carrying capacity K =", round(K, 3)))
+        }
         if (s > 0 && r > 0) {
             p <- p +
                 geom_vline(xintercept = sing_t,
@@ -207,12 +247,11 @@ server <- function(input, output, session) {
         }
         
         # Density Plot
-        p2 <- ggplot(subset(dat, t > 5),
-                     aes(x = !!sym(y_ax))) +
-            geom_histogram(bins = 10) +
-            labs(x = y_ax, y = "Count", title = "Distribution after t = 5") +
+        p2 <- ggplot(dat, aes(x = !!sym(y_ax))) +
+            geom_histogram(bins = input$t_max/2, fill = "black") +
+            labs(x = input$y_axis, y = "Count", title = "Distribution") +
             theme_minimal() +
-            coord_flip()
+            coord_flip(xlim = range(dat[[y_ax]]))
         
         p <- p + p2 + plot_layout(widths = c(2, 1))
         return(p)
