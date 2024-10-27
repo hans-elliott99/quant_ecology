@@ -1,0 +1,92 @@
+---
+title: "Intro to Differential Equations"
+author: "H Elliott"
+format:
+    gfm:
+        html-math-method: webtex
+    html: default
+toc: true
+---
+
+## Basic model of population growth for a single species  
+
+Let $N(t)$ be a function that describes the size of a population evolving over time. Let parameter $r$ describe the "intrinsic" per-capita growth rate of the population - i.e., the per-capita growth rate if the population was free from any resource constraints or any other effects of its own density. Let parameter $s$ determine how the current size of the population effects the per-capita growth rate.
+
+We can write this as a first-order differential equation:  
+
+
+$$
+\frac{1}{N} \frac{dN}{dt} = r + sN
+$$
+
+We can solve this equation by separating variables:   
+
+
+- $\frac{dN}{N ( r + s N)} = dt$  
+- $\int \frac{dN}{N ( r + s N)} = \int dt$  
+    - $\int \frac{dN}{N ( r + s N)} = \int \left( \frac{1}{r} \frac{dN}{N} - \frac{1}{r} \frac{dN}{r + sN} \right)$  (using partial fractions)
+    - $= \frac{1}{r} \int \frac{dN}{N} - \frac{1}{r} \int \frac{dN}{r + sN}$  
+    - $= \frac{1}{r} ( \ln N - \ln (r + sN) )$  
+- $\frac{1}{r} (\ln N - \ln (Ns + r)) = t + C$  
+- $\ln N - \ln (Ns + r) = rt + Cr$  
+- $\ln \frac{N}{Ns + r} = rt + Cr$  
+- $\frac{N}{Ns + r} = e^{rt + Cr}$  
+- $N = e^{rt + Cr} (Ns + r)$  
+- $N = e^{rt + Cr} Ns + e^{rt + Cr} r$  
+- $N - e^{rt + Cr} Ns = e^{rt + Cr} r$  
+- $N (1 - e^{rt + Cr} s) = e^{rt + Cr} r$  
+- $N = \frac{e^{rt + Cr} r}{1 - e^{rt + Cr} s}$  
+- $N = \frac{r}{e^{-rt - Cr} - s}$  
+- $N = \frac{r}{A e^{-rt} - s}$, where $A = e^{-Cr}$ is a constant.  
+
+
+If at $t = 0$, $N = N_0$ (some initial population size), then:  
+
+- $N_0 = \frac{r}{A e^{-r \cdot 0} - s}$  
+- $N_0 = \frac{r}{A - s}$  
+- $N_0 A - N_0 s = r$  
+- $A = \frac{r + N_0 s}{N_0}$  
+
+
+So the particular solution, for any initial population $N_0$ at time $t = 0$:  
+
+$$
+N(t) = \frac{r}{\frac{r + N_0 s}{N_0} e^{-rt} - s}  
+$$
+
+Note that solving the equation relied on $r \neq 0$ since we saw $1/r$ appear early in the process. Further, examining the final solution you can see that $r = 0$ implies that $N = 0 / (s - s) = 0/0$ which is undefined.  
+
+
+## If r = 0
+
+Notice that if $r = 0$, then the differential equation simplifies so that population growth is entirely dependent on the current population size - there is no intrinsic growth:  
+
+$$
+\frac{dN}{dt} = sN^2
+$$
+
+
+- $\frac{dN}{N^2} = s dt$  
+- $\int \frac{1}{N^2} dN = \int s dt$  
+- $- \frac{1}{N} = st + C$  
+- $N = \frac{1}{-st - C}$  
+
+If $N = N_0$ at $t = 0$, then:  
+
+- $N_0 = \frac{1}{-s \cdot 0 - C}$  
+- $N_0 = \frac{1}{-C}$  
+- $C = -\frac{1}{N_0}$  
+
+So the particular solution is:  
+
+$$
+N(t) = \frac{1}{-s t + \frac{1}{N_0}}
+$$
+
+
+
+
+Now it's clear that this solution will fail if $N_0 = 0$, but that is already a special case, since if $N_0 = 0$ and $r = 0$, the the population will remain at $0$ for all time. In this case, $N(t) = 0$ would be the solution. 
+
+
+

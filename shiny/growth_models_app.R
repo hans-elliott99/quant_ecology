@@ -2,6 +2,11 @@
 #' 
 #' Inspired by Ch. 7 of "Quantitative Ecology: A New Unified Approach" by
 #'   Lehman, Loberg, and Clark.
+#' And by "Elementary Differential Equations and Boundary Value Problems" by
+#'   Boyce and DiPrima.
+#'
+#' H. Elliott 2024
+#'
 
 library(shiny)
 library(ggplot2)
@@ -48,14 +53,19 @@ solve_diff_eq <- function(simdat, t_max, length.out = 1000) {
     r <- attr(simdat, "r")
     s <- attr(simdat, "s")
     N0 <- attr(simdat, "N0")
-    differ <- data.frame(x = seq(0, t_max, length.out = length.out))
-    differ$y <- vapply(differ$x,
-                       function(t) {
-                           1 / (
-                               ((s/r) + (1/N0)) * exp(-r * t) - (s/r)
-                               )},
-                          numeric(1))
-    return(differ)
+    A <- (r + N0 * s) / N0
+    diffeq <- data.frame(x = seq(0, t_max, length.out = length.out))
+    if (r == 0) {
+        .fn <- function(t) {
+            1 / (-s * t + 1 / N0)
+        }
+    } else {
+        .fn <- function(t) {
+            r / (A * exp(-r * t) - s)
+        } 
+    }
+    diffeq$y <- vapply(diffeq$x, .fn, numeric(1))
+    return(diffeq)
 }
 
 #' plot direction field
@@ -71,7 +81,7 @@ plot_directionfield <- function(f,
     
     # initial plot - ensure large enough
     plot(t_range, y_range,
-         main = "Direction field", ylab = "y", xlab = "t",
+         main = "Direction field", ylab = "N", xlab = "t",
          pch = ".")
     # plot arrows
     tlin = seq(min(t_range), max(t_range), grid.by.t)
@@ -82,11 +92,11 @@ plot_directionfield <- function(f,
             if(is.na(slope)) {
                 col = rgb(0, 0, 0, alpha)
             } else if(slope > 0) {
-                col = rgb(0, 0, 1, alpha)
+                col = rgb(0.2, 0.75, 0.3, alpha)
             } else if (slope < 0) {
-                col = rgb(1, 0, 0, alpha)
+                col = rgb(0.9, 0.1, 0.2, alpha)
             } else if(slope == 0) {
-                col = rgb(0, 1, 0, alpha)
+                col = rgb(0.2, 0.5, 0.9, alpha)
             }
             arrows(radius * cos(atan(slope) + pi) + x,
                    radius * sin(atan(slope) + pi) + y,
@@ -226,12 +236,12 @@ server <- function(input, output, session) {
             theme_minimal() +
             theme(legend.position = "bottom")
         
-        differ <- solve_diff_eq(dat, t_max = input$t_max)
-        differ[differ$x > sing_t, "y"] <- NA
-        differ <- differ[!is.na(differ$y), ]
+        diffeq <- solve_diff_eq(dat, t_max = input$t_max)
+        diffeq[diffeq$x > sing_t, "y"] <- NA
+        diffeq <- diffeq[!is.na(diffeq$y), ]
         if (x_ax == "t" & y_ax == "N") {
             p <- p +
-                geom_line(data = differ,
+                geom_line(data = diffeq,
                           aes(x = x, y = y, color = "Differential Eq. Solution"),
                           alpha = 0.5)
         }
@@ -274,10 +284,21 @@ server <- function(input, output, session) {
         r <- attr(dat, "r")
         s <- attr(dat, "s")
         N0 <- attr(dat, "N0")
-        y_max <- min(max(dat$N, na.rm = TRUE) + 0.1, 1)
+        sing_t <- attr(dat, "sing_t")
+        
+        diffeq <- solve_diff_eq(dat, t_max = input$t_max)
+        diffeq[diffeq$x > sing_t, "y"] <- NA
+        diffeq <- diffeq[!is.na(diffeq$y), ]
+        
+        # y_max <- min(max(dat$N, na.rm = TRUE) + 0.1, 1)
+        
+        # NOTE: r = 0, s = -0.5 breaks!!
+        y_max <- max(diffeq$y, na.rm = TRUE) + 0.1
+        if (is.infinite(y_max)) {
+            y_max <- Inf
+        }
+        y_max <- min(y_max, 10)
         t_max <- input$t_max
-        
-        
         
         f <- \(t, N) N * (r + s * N)
         plot_directionfield(f,
@@ -287,6 +308,8 @@ server <- function(input, output, session) {
                             grid.by.y = y_max/50,
                             radius = t_max/(200 * (t_max/20)),
                             alpha = 0.7)
+        lines(diffeq$x, diffeq$y, col = "black")
+        points(x = 0, y = N0, col = "black", pch = 19)
     })
 }
 
