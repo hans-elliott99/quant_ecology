@@ -112,7 +112,13 @@ plot_directionfield <- function(f,
 ui <- fluidPage(
     withMathJax(),
     h1("Basic models of population growth"),
-    p("Inspired by 'Quantitative Ecology: A New Unified Approach' by Lehman, Loberg, and Clark."),
+    p("Inspired by ",
+        a("'Quantitative Ecology: A New Unified Approach'",
+          href = "https://open.umn.edu/opentextbooks/textbooks/751"),
+      " by Lehman, Loberg, and Clark."),
+    p("App by H. Elliott, 2024. Code available on ",
+      a("github.", href = "https://github.com/hans-elliott99/quant_ecology")
+    ),
     h2("Single-Species Dynamics"),
     p(paste(
         "Let N(t) describe the population size of some species evolving over time.\n",
